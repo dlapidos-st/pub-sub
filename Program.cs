@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 
 using PubSub;
+
 using ServiceTitan.Platform.PubSub;
 using ServiceTitan.Platform.PubSub.Kafka;
 
@@ -12,20 +13,25 @@ builder
     .AddPubSub(pubSubBuilder =>
     {
         const string kafkaBrokers = "localhost:29092,localhost:39092";
-        const string topic = "routing-api";
-        const string groupId = "my-group-1";
+        const string groupId = "my-sample-group-1";
+        const string topicName = "my-sample-topic";
 
         pubSubBuilder
-            .AddKafka()
+            .AddKafka(kafkaBuilder =>
+            {
+                kafkaBuilder
+                    .SetClientConfiguration(new() { BootstrapServers = kafkaBrokers })
+                    .CreateTopicIfNotExist(topicName, topicConfiguration =>
+                    {
+                        topicConfiguration.NumPartitions = 2;
+                        topicConfiguration.ReplicationFactor = 2;
+                    });
+            })
             .Produce(produceBuilder =>
             {
-                ProducerConfig kafkaProducerConfig = new()
-                {
-                    BootstrapServers = kafkaBrokers
-                };
-
+                ProducerConfig kafkaProducerConfig = new() { BootstrapServers = kafkaBrokers };
                 produceBuilder
-                    .ForMessage<BusinessUnit>(topic, pipelineBuilder =>
+                    .ForMessage<BusinessUnit>(topicName, pipelineBuilder =>
                         pipelineBuilder
                             .SetKey<BusinessUnit>(model => model.TenantId!)
                             .UseJsonSerializer()
@@ -44,7 +50,7 @@ builder
                 };
 
                 consumeBuilder
-                    .AddKafkaConsumer(new(kafkaConsumerConfig, new[] { topic }), new DefaultTypeIdResolver(), consume =>
+                    .AddKafkaConsumer(new(kafkaConsumerConfig, new[] { topicName }), new DefaultTypeIdResolver(), consume =>
                        consume
                            .UseJsonDeserializer()
                            .ForMessage<BusinessUnit>(consumePipelineBuilder =>
@@ -59,19 +65,16 @@ var app = builder.Build();
 app.MapPost("/message", async context =>
 {
     int.TryParse(context.Request.Query["count"], out int count);
-
     count = count < 1 ? 1 : count;
 
     DateTime now = DateTime.Now;
     string tenantId = $"tenant-{now.Second}";
 
     IBus bus = context.RequestServices.GetRequiredService<IBus>();
-    for (int index = 0; index < count; index++)
-    {
-        BusinessUnit businessUnit = new() { TenantId = tenantId, Id = DateTime.Now.Ticks, Name = now.ToString() };
 
-        await bus.PublishAsync(businessUnit);
-    }
+    await Parallel
+            .ForEachAsync(Enumerable.Range(1, count), new ParallelOptions() { MaxDegreeOfParallelism = 4 }, async (_, _) =>
+                await bus.PublishAsync(new BusinessUnit() { TenantId = tenantId, Id = DateTime.Now.Ticks, Name = now.ToString() }));
 
     context.Response.StatusCode = 200;
     await context.Response.WriteAsync("OK");
