@@ -36,7 +36,6 @@ builder
                             .SetKey<BusinessUnit>(model => model.TenantId!)
                             .UseJsonSerializer()
                             .UseKafkaSender(new(kafkaProducerConfig)));
-
             })
             .Consume(consumeBuilder =>
             {
@@ -56,8 +55,7 @@ builder
                            .ForMessage<BusinessUnit>(consumePipelineBuilder =>
                                consumePipelineBuilder
                                     .Handle<BusinessUnit, BusinessUnitChangedEvent>()));
-            })
-            ;
+            });
     });
 
 var app = builder.Build();
@@ -80,4 +78,4 @@ app.MapPost("/message", async context =>
     await context.Response.WriteAsync("OK");
 });
 
-app.Run();
+await app.RunAsync();
