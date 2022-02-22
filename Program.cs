@@ -2,6 +2,7 @@ using Confluent.Kafka;
 
 using PubSub;
 
+using ServiceTitan.Messaging.CapacityPlanning.Protos;
 using ServiceTitan.Platform.PubSub;
 using ServiceTitan.Platform.PubSub.Kafka;
 
@@ -10,11 +11,12 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 builder
   .Services
     .AddSingleton<BusinessUnitChangedEvent>()
+    .AddSingleton<TenantConfigurationMessageHandler>()
     .AddPubSub(pubSubBuilder =>
     {
-        const string kafkaBrokers = "localhost:29092,localhost:39092";
-        const string groupId = "my-sample-group-1";
-        const string topicName = "my-sample-topic";
+        const string kafkaBrokers = "localhost:9092";
+        const string groupId = "my-sample-group-1201a";
+        const string topicName = "azure.capacity-planning.tenant-configuration.v1";
 
         pubSubBuilder
             .AddKafka(kafkaBuilder =>
@@ -48,13 +50,23 @@ builder
                     EnableAutoCommit = true
                 };
 
+                ConsumerConfiguration consumerConfiguration = new(kafkaConsumerConfig, new[] { topicName });
+
                 consumeBuilder
-                    .AddKafkaConsumer(new(kafkaConsumerConfig, new[] { topicName }), new DefaultTypeIdResolver(), consume =>
+                    .AddKafkaConsumer(new(kafkaConsumerConfig, new[] { topicName }) { ErrorHandler = (_, e) => System.Console.WriteLine(e) }, new DefaultTypeIdResolver(), consume =>
+                        consume
+                            .UseJsonDeserializer()
+                            .ForMessage<BusinessUnit>(consumePipelineBuilder =>
+                                consumePipelineBuilder
+                                     .Handle<BusinessUnit, BusinessUnitChangedEvent>()));
+
+                consumeBuilder
+                    .AddKafkaConsumer(consumerConfiguration, new ProtobufTypeIdResolver(), consume =>
                        consume
-                           .UseJsonDeserializer()
-                           .ForMessage<BusinessUnit>(consumePipelineBuilder =>
+                           .UseProtobufDeserializer(completeOnUnknownMessageTypeId: false, completeOnDeserializeError: false)
+                           .ForMessage<TenantConfiguration>(consumePipelineBuilder =>
                                consumePipelineBuilder
-                                    .Handle<BusinessUnit, BusinessUnitChangedEvent>()));
+                                    .Handle<TenantConfiguration, TenantConfigurationMessageHandler>()));
             });
     });
 
