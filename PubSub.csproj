@@ -7,8 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ServiceTitan.Platform.PubSub" Version="3.59.28" />
-    <PackageReference Include="ServiceTitan.Platform.PubSub.Kafka" Version="3.59.28" />
+    <PackageReference Include="ServiceTitan.Messaging.CapacityPlanning" Version="0.1.130" />
+    <PackageReference Include="ServiceTitan.Platform.PubSub" Version="3.59.67-bap-shinsey-ARCH-3298.g3c079da634" />
+    <PackageReference Include="ServiceTitan.Platform.PubSub.Kafka" Version="3.59.67-bap-shinsey-ARCH-3298.g3c079da634" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.2.3" />
   </ItemGroup>
 
