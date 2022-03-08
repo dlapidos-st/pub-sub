@@ -1,5 +1,6 @@
 # PubSub Example
 
+
 ## Purpose
 This project demonstrates the use of internal PubSub components to produce new messages into a Kafka topic, and to consume new events written to the same Kafka topic.
 
